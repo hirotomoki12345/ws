@@ -3,11 +3,10 @@ const WebSocket = require('ws');
 const express = require('express');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
-const sanitizer = require('sanitizer');
-const fs = require('fs');
+const DOMPurify = require('dompurify');
+const { JSDOM } = require('jsdom');
 
 const PORT = 5210;
-const CLIENT_ID_FILE = 'client_ids.txt';
 
 const app = express();
 app.use(cors());
@@ -24,31 +23,36 @@ const wss = new WebSocket.Server({ server });
 
 let clients = {};
 
-function saveClientIds() {
-    fs.writeFileSync(CLIENT_ID_FILE, JSON.stringify(Object.keys(clients)), 'utf-8');
-}
+const window = new JSDOM('').window;
+const purify = DOMPurify(window);
 
 wss.on('connection', (ws) => {
+    console.log('新しいクライアントが接続しました');
+
     ws.on('message', (message) => {
         const data = JSON.parse(message);
         if (data.id) {
             clients[data.id] = ws;
-            saveClientIds();
+            console.log(`クライアントID: ${data.id} が接続しました`);
         }
         if (data.to && data.message) {
+            const sanitizedMessage = purify.sanitize(data.message);
             const targetClient = clients[data.to];
-            const sanitizedMessage = sanitizer.sanitize(data.message);
             if (targetClient) {
                 targetClient.send(JSON.stringify({ from: data.id, message: sanitizedMessage }));
+                console.log(`メッセージを送信しました: from=${data.id}, to=${data.to}, message=${sanitizedMessage}`);
+            } else {
+                console.log(`ターゲットクライアントが見つかりません: ${data.to}`);
             }
         }
     });
 
     ws.on('close', () => {
+        console.log('クライアントが切断されました');
         for (const id in clients) {
             if (clients[id] === ws) {
+                console.log(`クライアントID: ${id} が切断されました`);
                 delete clients[id];
-                saveClientIds();
                 break;
             }
         }
