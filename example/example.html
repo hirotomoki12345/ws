@@ -15,6 +15,11 @@
 
     // WebSocket接続の初期化
     function initWebSocket() {
+      if (ws) {
+        console.log('すでに接続しています。');
+        return;
+      }
+
       ws = new WebSocket(SERVER_URL);
 
       ws.onopen = () => {
@@ -48,8 +53,20 @@
       }
     }
 
-    // 複数のクライアントにメッセージを送信する関数
+    // クライアントにメッセージを送信する関数
     function sendMessageToClients(targetIds, message) {
+      // targetIdsが配列でない場合、配列に変換
+      if (!Array.isArray(targetIds)) {
+        targetIds = [targetIds];
+      }
+
+      // WebSocketが未接続の場合は初期化する
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        console.log('WebSocket接続を初期化します。');
+        initWebSocket(); // WebSocketを初期化
+      }
+
+      // WebSocketが開かれている場合、メッセージを送信
       if (ws.readyState === WebSocket.OPEN) {
         targetIds.forEach(targetId => {
           ws.send(JSON.stringify({
@@ -64,6 +81,10 @@
       }
     }
 
+    // グローバルに関数を公開
+    window.initWebSocket = initWebSocket;
+    window.sendMessageToClients = sendMessageToClients;
+
     // 接続の初期化
     initWebSocket();
 
@@ -72,6 +93,9 @@
       const targetIds = ['client_1635868576783', 'client_1635868576784']; // 実際のクライアントIDを指定
       const message = 'こんにちは！';
       sendMessageToClients(targetIds, message);
+      
+      // 単体IDを使ったメッセージ送信の例
+      sendMessageToClients('client_1635868576785', 'こんにちは！単体メッセージ');
     }, 5000);
   </script>
 </body>
