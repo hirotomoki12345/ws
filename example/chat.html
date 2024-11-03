@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>チャットサイト</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        #messages {
+            border: 1px solid #ccc;
+            padding: 10px;
+            height: 300px;
+            overflow-y: scroll;
+        }
+        input, button {
+            margin-top: 10px;
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+        }
+        #clientIdDisplay {
+            margin-top: 10px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>チャットサイト</h1>
+    <div>
+        <label for="clientId">自分のID:</label>
+        <input type="text" id="clientId" placeholder="クライアントIDを入力" required>
+        <div id="clientIdDisplay">自分のID: <span id="displayClientId"></span></div>
+
+        <label for="targetId">送信先ID:</label>
+        <input type="text" id="targetId" placeholder="送信先のクライアントIDを入力" required>
+        
+        <label for="messageInput">メッセージ:</label>
+        <input type="text" id="messageInput" placeholder="メッセージを入力" required>
+        
+        <button id="sendButton">送信</button>
+    </div>
+    <div id="messages"></div>
+
+    <script>
+        const SERVER_URL = 'wss://ws.psannetwork.net/';
+        let ws;
+        let clientId;
+
+        function initWebSocket() {
+            ws = new WebSocket(SERVER_URL);
+
+            ws.onopen = () => {
+                console.log('サーバーに接続しました');
+            };
+
+            ws.onmessage = (event) => {
+                handleMessage(event.data);
+            };
+
+            ws.onerror = (error) => {
+                console.error('接続エラー:', error);
+            };
+
+            ws.onclose = () => {
+                console.log('サーバーから切断されました');
+            };
+        }
+
+        function handleMessage(data) {
+            const message = JSON.parse(data);
+            if (message.from && message.message) {
+                displayMessage(`受信: from=${message.from}, 内容=${message.message}`);
+            }
+        }
+
+        function sendMessage() {
+            const targetId = document.getElementById('targetId').value;
+            const message = document.getElementById('messageInput').value;
+
+            if (ws.readyState === WebSocket.OPEN) {
+                const msg = createMessage({ to: targetId, message: message });
+                ws.send(JSON.stringify(msg));
+                displayMessage(`送信: to=${targetId}, 内容=${message}`);
+                document.getElementById('messageInput').value = '';
+            } else {
+                console.log('WebSocket接続が確立されていない。');
+            }
+        }
+
+        function createMessage(data) {
+            return {
+                id: clientId,
+                ...data
+            };
+        }
+
+        function displayMessage(msg) {
+            const messagesDiv = document.getElementById('messages');
+            messagesDiv.innerHTML += `<div>${msg}</div>`;
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        document.getElementById('sendButton').addEventListener('click', () => {
+            if (!clientId) {
+                clientId = document.getElementById('clientId').value;
+                document.getElementById('displayClientId').innerText = clientId;
+                sendIdToServer(clientId);
+            }
+            sendMessage();
+        });
+
+        function sendIdToServer(id) {
+            const message = createMessage({ id });
+            ws.send(JSON.stringify(message));
+        }
+
+        initWebSocket();
+    </script>
+</body>
+</html>
