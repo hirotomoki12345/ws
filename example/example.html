@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebSocket クライアント</title>
+</head>
+<body>
+  <h1>WebSocketクライアント</h1>
+
+  <script>
+    const SERVER_URL = 'wss://ws.psannetwork.net/'; // SSLの場合は wss://
+    const clientId = `client_${Date.now()}`;
+    let ws;
+
+    // WebSocket接続の初期化
+    function initWebSocket() {
+      ws = new WebSocket(SERVER_URL);
+
+      ws.onopen = () => {
+        console.log('サーバーに接続しました');
+        sendIdToServer(clientId);
+      };
+
+      ws.onmessage = (event) => {
+        handleMessage(event.data);
+      };
+
+      ws.onerror = (error) => {
+        console.error('接続エラー:', error);
+      };
+
+      ws.onclose = () => {
+        console.log('サーバーから切断されました');
+      };
+    }
+
+    // 自分のIDをサーバーに送信
+    function sendIdToServer(id) {
+      ws.send(JSON.stringify({ id }));
+    }
+
+    // メッセージを受信したときの処理
+    function handleMessage(data) {
+      const message = JSON.parse(data);
+      if (message.from && message.message) {
+        console.log(`メッセージを受信しました: from=${message.from} 内容=${message.message}`);
+      }
+    }
+
+    // 複数のクライアントにメッセージを送信する関数
+    function sendMessageToClients(targetIds, message) {
+      if (ws.readyState === WebSocket.OPEN) {
+        targetIds.forEach(targetId => {
+          ws.send(JSON.stringify({
+            id: clientId,
+            to: targetId,
+            message: message
+          }));
+          console.log(`メッセージを送信しました: to=${targetId}`);
+        });
+      } else {
+        console.log('WebSocket接続が確立されていない。');
+      }
+    }
+
+    // 接続の初期化
+    initWebSocket();
+
+    // 5秒後に複数のクライアントにメッセージを送信する例
+    setTimeout(() => {
+      const targetIds = ['client_1635868576783', 'client_1635868576784']; // 実際のクライアントIDを指定
+      const message = 'こんにちは！';
+      sendMessageToClients(targetIds, message);
+    }, 5000);
+  </script>
+</body>
+</html>
