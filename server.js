@@ -38,9 +38,31 @@ wss.on('connection', (ws) => {
         if (data.to && data.message) {
             const sanitizedMessage = purify.sanitize(data.message);
             const targetClient = clients[data.to];
+            const timestamp = new Date().toISOString(); // 現在のタイムスタンプを取得
+
             if (targetClient) {
-                targetClient.send(JSON.stringify({ from: data.id, message: sanitizedMessage }));
+                targetClient.send(JSON.stringify({
+                    from: data.id,
+                    message: sanitizedMessage,
+                    timestamp: timestamp // タイムスタンプを追加
+                }));
                 console.log(`メッセージを送信しました: from=${data.id}, to=${data.to}, message=${sanitizedMessage}`);
+            } else {
+                console.log(`ターゲットクライアントが見つかりません: ${data.to}`);
+            }
+        }
+        // ファイル送信の処理
+        if (data.to && data.file) {
+            const targetClient = clients[data.to];
+            const timestamp = new Date().toISOString(); // 現在のタイムスタンプを取得
+
+            if (targetClient) {
+                targetClient.send(JSON.stringify({
+                    from: data.id,
+                    file: data.file,
+                    timestamp: timestamp // タイムスタンプを追加
+                }));
+                console.log(`ファイルを送信しました: from=${data.id}, to=${data.to}`);
             } else {
                 console.log(`ターゲットクライアントが見つかりません: ${data.to}`);
             }
