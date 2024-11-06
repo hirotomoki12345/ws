@@ -12,7 +12,7 @@ const app = express();
 app.use(cors());
 
 const limiter = rateLimit({
-    windowMs: 1 * 60 * 1000,
+    windowMs: 60 * 1000,
     max: 100,
     message: 'リクエストの制限を超えました。しばらく待ってから再試行してください。'
 });
@@ -31,36 +31,38 @@ wss.on('connection', (ws) => {
 
     ws.on('message', (message) => {
         const data = JSON.parse(message);
+        
         if (data.id) {
             clients[data.id] = ws;
             console.log(`クライアントID: ${data.id} が接続しました`);
         }
+
         if (data.to && data.message) {
             const sanitizedMessage = purify.sanitize(data.message);
             const targetClient = clients[data.to];
-            const timestamp = new Date().toISOString(); // 現在のタイムスタンプを取得
+            const timestamp = new Date().toISOString();
 
             if (targetClient) {
                 targetClient.send(JSON.stringify({
                     from: data.id,
                     message: sanitizedMessage,
-                    timestamp: timestamp // タイムスタンプを追加
+                    timestamp: timestamp
                 }));
                 console.log(`メッセージを送信しました: from=${data.id}, to=${data.to}, message=${sanitizedMessage}`);
             } else {
                 console.log(`ターゲットクライアントが見つかりません: ${data.to}`);
             }
         }
-        // ファイル送信の処理
+
         if (data.to && data.file) {
             const targetClient = clients[data.to];
-            const timestamp = new Date().toISOString(); // 現在のタイムスタンプを取得
+            const timestamp = new Date().toISOString();
 
             if (targetClient) {
                 targetClient.send(JSON.stringify({
                     from: data.id,
                     file: data.file,
-                    timestamp: timestamp // タイムスタンプを追加
+                    timestamp: timestamp
                 }));
                 console.log(`ファイルを送信しました: from=${data.id}, to=${data.to}`);
             } else {
