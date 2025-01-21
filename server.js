@@ -5,6 +5,8 @@ const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 const DOMPurify = require('dompurify');
 const { JSDOM } = require('jsdom');
+const fs = require('fs');
+const path = require('path');
 
 const PORT = 5210;
 
@@ -27,6 +29,16 @@ const clients = new Map();
 
 const window = new JSDOM('').window;
 const purify = DOMPurify(window);
+
+// クライアント履歴を保存するファイルパス
+const CLIENTS_FILE_PATH = path.join(__dirname, 'clients.txt');
+
+// クライアント履歴ファイルがあれば読み込む
+let clientHistory = {};
+if (fs.existsSync(CLIENTS_FILE_PATH)) {
+    const rawData = fs.readFileSync(CLIENTS_FILE_PATH, 'utf-8');
+    clientHistory = JSON.parse(rawData);
+}
 
 // データ検証用ヘルパー関数
 const isValidJSON = (str) => {
@@ -67,9 +79,18 @@ wss.on('connection', (ws) => {
         // メッセージ送信処理
         if (data.to && data.message) {
             const sanitizedMessage = purify.sanitize(data.message);
-            const targetClient = clients.get(data.to);
             const timestamp = new Date().toISOString();
 
+            // 通信履歴を更新
+            if (!clientHistory[data.id]) {
+                clientHistory[data.id] = [];
+            }
+            clientHistory[data.id].push({ date: timestamp, content: sanitizedMessage });
+
+            // 履歴をファイルに保存
+            fs.writeFileSync(CLIENTS_FILE_PATH, JSON.stringify(clientHistory, null, 2));
+
+            const targetClient = clients.get(data.to);
             if (targetClient) {
                 try {
                     targetClient.send(JSON.stringify({
@@ -88,9 +109,18 @@ wss.on('connection', (ws) => {
 
         // ファイル送信処理
         if (data.to && data.file) {
-            const targetClient = clients.get(data.to);
             const timestamp = new Date().toISOString();
 
+            // 通信履歴を更新
+            if (!clientHistory[data.id]) {
+                clientHistory[data.id] = [];
+            }
+            clientHistory[data.id].push({ date: timestamp, content: `File: ${data.file.name}` });
+
+            // 履歴をファイルに保存
+            fs.writeFileSync(CLIENTS_FILE_PATH, JSON.stringify(clientHistory, null, 2));
+
+            const targetClient = clients.get(data.to);
             if (targetClient) {
                 try {
                     targetClient.send(JSON.stringify({
@@ -124,6 +154,17 @@ wss.on('connection', (ws) => {
     ws.on('error', (err) => {
         console.error('WebSocketエラー:', err);
     });
+});
+
+// /all エンドポイントの追加
+app.get('/all', (req, res) => {
+    res.json(clientHistory);
+});
+
+// /ids エンドポイントの追加
+app.get('/ids', (req, res) => {
+    const ids = Object.keys(clientHistory);
+    res.json({ ids });
 });
 
 // サーバー起動
